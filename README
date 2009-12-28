@@ -1,0 +1,11 @@
+KTAnki (pronounced 'cute anki') is a small Anki client to review
+and sync your decks on Maemo platform (tested on N900).
+
+It's written in PyQt and based on ankimaemi by Stefan Sayer and
+ankimini by Damien Elmes.
+
+For now it's a very raw prototype so USE IT AT YOUR OWN RISK.
+
+Links:
+http://ichi2.net/anki/
+http://github.com/sanchi/ankimaemi
