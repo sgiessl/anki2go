@@ -26,9 +26,6 @@ from PyQt4 import QtCore
 from anki import DeckStorage
 from anki.sync import SyncClient
 from anki.sync import HttpSyncServerProxy
-from anki.media import mediaRefs
-from anki.utils import parseTags
-from anki.utils import joinTags
 
 CONFIG_PATH = '~/.ktankirc'
 
