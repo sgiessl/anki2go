@@ -355,7 +355,7 @@ class KTAnki(QtGui.QMainWindow):
         <div class="question">%s</div>
         <div class="answer"> %s </div>
         </center>
-        """ % (card.question.encode('utf-8'), card.answer)
+        """ % (card.question, card.answer)
 
         self.options_widget.show()
         self.answer_widget.hide()
