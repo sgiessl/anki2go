@@ -26,6 +26,7 @@ from PyQt4 import QtCore
 from anki import DeckStorage
 from anki.sync import SyncClient
 from anki.sync import HttpSyncServerProxy
+from anki.utils import fmtTimeSpan
 
 CONFIG_PATH = '~/.ktankirc'
 
@@ -325,9 +326,24 @@ class KTAnki(QtGui.QMainWindow):
         self.show_question()
         self.show_stats()
 
+    def get_future_warning(self):
+        if (self.current_card is None
+            or self.current_card.due <= time.time()
+            or self.current_card.due - time.time() <= self.deck.delay0
+            ):
+            return ''
+        warning = (
+            '<center><span style="color: red;">' +
+            'This card was due in %s.' % fmtTimeSpan(
+                self.current_card.due - time.time(), after=False) +
+            '</span></center>'
+            )
+        return warning
+
     def show_question(self):
-        question_tmpl = '<center><div class="question">%s</div></center>'
         card = self.current_card = self.deck.getCard(orm=False)
+        question_tmpl = self.get_future_warning()
+        question_tmpl += '<center><div class="question">%s</div></center>'
 
         if card is not None:
             self.options_widget.show()
