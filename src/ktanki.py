@@ -287,7 +287,7 @@ class KTAnki(QtGui.QMainWindow):
     def _reset_display(self):
         # show/hide widgets for initial display
         self.options_widget.hide()
-        self. answer_widget.hide()
+        self.answer_widget.hide()
         self.learnmore_widget.hide()
         self.repeat_widget.hide()
 
