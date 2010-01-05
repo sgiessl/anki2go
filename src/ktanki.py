@@ -16,6 +16,7 @@
 import os
 import sys
 import time
+import datetime
 
 from functools import partial
 from ConfigParser import ConfigParser
@@ -217,9 +218,11 @@ class KTAnki(QtGui.QMainWindow):
 
         sync_button = QtGui.QPushButton('Sync')
         undo_button = QtGui.QPushButton('Undo Answer')
+        studyopt_button = QtGui.QPushButton('Study Options')
         options_layout.addWidget(save_button)
         options_layout.addWidget(sync_button)
         options_layout.addWidget(undo_button)
+        options_layout.addWidget(studyopt_button)
 
         # central read-only QTextEdit widget
         self.textedit = QtGui.QTextEdit()
@@ -273,6 +276,8 @@ class KTAnki(QtGui.QMainWindow):
         self.connect(save_button, QtCore.SIGNAL('clicked()'), self.save)
         self.connect(sync_button, QtCore.SIGNAL('clicked()'), self.sync)
         self.connect(undo_button, QtCore.SIGNAL('clicked()'), self.undo)
+        self.connect(studyopt_button, QtCore.SIGNAL('clicked()'),
+                     self.show_study_options)
 
         # central widget
         self.setCentralWidget(main_widget)
@@ -384,6 +389,17 @@ class KTAnki(QtGui.QMainWindow):
             self.repeat_buttons[index-1].setText(
                 self.deck.nextIntervalStr(card, index, True))
 
+    def show_study_options(self):
+        self.deck.resetAfterReviewEarly()
+        self.deck.save()
+
+        self.options_widget.hide()
+        self.answer_widget.hide()
+        self.repeat_widget.hide()
+        self.learnmore_widget.show()
+
+        self.show_study_stats()
+
     def display_doc(self, html):
         doc = """
         <html>
@@ -422,6 +438,84 @@ class KTAnki(QtGui.QMainWindow):
         stats2 = ("<font size=+2>%s+%s+%s</font>" % (f, r, n)) % s
         self.stats_label.setText(stats)
         self.stats2_label.setText(stats2)
+
+
+    def show_study_stats(self):
+        """Based on method from ankiqt."""
+        was_reached = self.deck.sessionLimitReached()
+        session_color = '<font color=#0000ff>%s</font>'
+        card_color = '<font color=#0000ff>%s</font>'
+        if not was_reached:
+            top = "<h1>Study Options</h1>"
+        else:
+            top = "<h1>Well done!</h1>"
+        # top label
+        h = {}
+        s = self.deck.getStats()
+        h['ret'] = card_color % (s['rev'] + s['failed'])
+        h['new'] = card_color % s['new']
+        h['newof'] = str(self.deck.newCountAll())
+        dtoday = s['dTotal']
+        yesterday = self.deck._dailyStats.day - datetime.timedelta(1)
+        res = self.deck.s.first("""
+        select reps, reviewTime from stats where type = 1 and
+        day = :d""", d=yesterday)
+        if res:
+            dyest, tyest = res
+        else:
+            dyest = tyest = 0
+        h['repsToday'] = session_color % dtoday
+        h['repsTodayChg'] = str(dyest)
+        limit = self.deck.sessionTimeLimit
+        start = self.deck.sessionStartTime or time.time() - limit
+        start2 = self.deck.lastSessionStart or start - limit
+        last10 = self.deck.s.scalar(
+            "select count(*) from reviewHistory where time >= :t",
+            t=start)
+        last20 = self.deck.s.scalar(
+            "select count(*) from reviewHistory where "
+            "time >= :t and time < :t2",
+            t=start2, t2=start)
+        h['repsInSes'] = session_color % last10
+        h['repsInSesChg'] = str(last20)
+        ttoday = s['dReviewTime']
+        h['timeToday'] = session_color % (
+            fmtTimeSpan(ttoday, short=True, point=1))
+        h['timeTodayChg'] = str(fmtTimeSpan(tyest, short=True, point=1))
+        h['cs_header'] = "Cards/session:"
+        h['cd_header'] = "Cards/day:"
+        h['td_header'] = "Time/day:"
+        h['rd_header'] = "Reviews due:"
+        h['ntod_header'] = "New today:"
+        h['ntot_header'] = "New total:"
+
+        stats1 = ("""\
+        <table>
+        <tr><td width=80>%(cs_header)s</td>
+        <td width=50><b>%(repsInSesChg)s</b></td>
+        <td><b>%(repsInSes)s</b></td></tr>
+        <tr><td>%(cd_header)s</td><td><b>%(repsTodayChg)s</b></td>
+        <td><b>%(repsToday)s</b></td></tr>
+        <tr><td>%(td_header)s</td><td><b>%(timeTodayChg)s</b></td>
+        <td><b>%(timeToday)s</b></td></tr>
+        </table>""") % h
+
+        stats2 = ("""\
+        <table>
+        <tr><td width=100>%(rd_header)s</td>
+        <td align=right><b>%(ret)s</b></td></tr>
+        <tr><td>%(ntod_header)s</td><td align=right><b>%(new)s</b></td></tr>
+        <tr><td>%(ntot_header)s</td><td align=right>%(newof)s</td></tr>
+        </table>""") % h
+        if not dyest and not dtoday:
+            stats1 = ""
+        else:
+            stats1 = (
+                "<td>%s</td><td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" % stats1)
+        self.display_doc(top + """\
+        <p><table><tr>
+        %s
+        <td>%s</td></tr></table>""" % (stats1, stats2))
 
 
 def main():
