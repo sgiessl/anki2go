@@ -416,6 +416,7 @@ class KTAnki(QtGui.QMainWindow):
         self._reset_display()
         self.contreview_widget.show()
         self.show_study_stats()
+        self.show_stats()
 
     def display_doc(self, html):
         doc = """
