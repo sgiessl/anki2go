@@ -363,9 +363,7 @@ class KTAnki(QtGui.QMainWindow):
 
     def show_question(self):
         self._reset_display()
-        if self.current_card is None:
-            self.current_card = self.deck.getCard(orm=False)
-        card = self.current_card
+        card = self.current_card = self.deck.getCard(orm=False)
         if card is not None:
             question_tmpl = self.get_future_warning()
             question_tmpl += '<center><div class="question">%s</div></center>'
