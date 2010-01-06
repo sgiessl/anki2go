@@ -185,14 +185,17 @@ class KTAnki(QtGui.QMainWindow):
         save_action = QtGui.QAction('Save', self)
         self.connect(save_action, QtCore.SIGNAL('triggered()'), self.save)
 
+        sync_action = QtGui.QAction('Sync', self)
+        self.connect(sync_action, QtCore.SIGNAL('triggered()'), self.sync)
+
         exit_action = QtGui.QAction('Exit', self)
         self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.close)
 
         menubar = self.menuBar()
         file = menubar.addAction(open_action)
         file = menubar.addAction(save_action)
+        file = menubar.addAction(sync_action)
         file = menubar.addAction(exit_action)
-
 
     def _init_central_widget(self):
         main_widget = QtGui.QWidget()
