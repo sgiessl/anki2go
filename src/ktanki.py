@@ -517,10 +517,10 @@ class KTAnki(QtGui.QMainWindow):
 
         stats2 = ("""\
         <table>
-        <tr><td width=100>%(rd_header)s</td>
-        <td align=right><b>%(ret)s</b></td></tr>
-        <tr><td>%(ntod_header)s</td><td align=right><b>%(new)s</b></td></tr>
-        <tr><td>%(ntot_header)s</td><td align=right>%(newof)s</td></tr>
+        <tr><td width="140">%(rd_header)s</td>
+        <td align="right"><b>%(ret)s</b></td></tr>
+        <tr><td>%(ntod_header)s</td><td align="right"><b>%(new)s</b></td></tr>
+        <tr><td>%(ntot_header)s</td><td align="right">%(newof)s</td></tr>
         </table>""") % h
         if not dyest and not dtoday:
             stats1 = ""
