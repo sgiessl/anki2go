@@ -210,7 +210,7 @@ class KTAnki(QtGui.QMainWindow):
                      self.show_study_options)
 
         exit_action = QtGui.QAction('Exit', self)
-        self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.close)
+        self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.exit_app)
 
         menubar = self.menuBar()
         file = menubar.addAction(open_action)
@@ -560,6 +560,20 @@ class KTAnki(QtGui.QMainWindow):
         # self.connect(self.refresh_timer, QtCore.SIGNAL('timeout()'),
         #              self.show_stats)
         pass
+
+    def exit_app(self):
+        if self.deck is not None and self.deck.modifiedSinceSave():
+            reply = QtGui.QMessageBox.question(
+                self, 'Ktanki - Unsaved changes',
+                'Save unsaved changes?',
+                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+            if reply == QtGui.QMessageBox.Yes:
+                try:
+                    self.deck.save()
+                except Exception, e:
+                    QtGui.QMessageBox.critical(self, 'Save error', e.message)
+                    return
+        self.close()
 
 
 def main():
