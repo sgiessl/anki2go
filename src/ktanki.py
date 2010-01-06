@@ -30,7 +30,8 @@ from anki.sync import HttpSyncServerProxy
 from anki.utils import fmtTimeSpan
 
 CONFIG_PATH = '~/.ktankirc'
-
+# default is 60 seconds
+REFRESH_TIME = 60 * 1000
 
 class KTAnki(QtGui.QMainWindow):
 
@@ -66,6 +67,7 @@ class KTAnki(QtGui.QMainWindow):
             self._reset_display()
             self.show_study_options()
             self.show_stats()
+            self.start_refresh_timer()
 
     def save(self):
         if self.deck is None:
@@ -526,6 +528,13 @@ class KTAnki(QtGui.QMainWindow):
         <p><table><tr>
         %s
         <td>%s</td></tr></table>""" % (stats1, stats2))
+
+    def start_refresh_timer(self):
+        """Update statistic periodically."""
+        self.refresh_timer = QtCore.QTimer(self)
+        self.refresh_timer.start(REFRESH_TIME)
+        self.connect(self.refresh_timer, QtCore.SIGNAL('timeout()'),
+                     self.show_stats)
 
 
 def main():
