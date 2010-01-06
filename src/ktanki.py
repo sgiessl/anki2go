@@ -19,6 +19,7 @@ import time
 import datetime
 
 from functools import partial
+from functools import wraps
 from ConfigParser import ConfigParser
 
 from PyQt4 import QtGui
@@ -32,6 +33,16 @@ from anki.utils import fmtTimeSpan
 CONFIG_PATH = '~/.ktankirc'
 # default is 60 seconds
 REFRESH_TIME = 60 * 1000
+
+def preserve_cwd(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        old_cwd = os.getcwd()
+        result = func(*args, **kwargs)
+        os.chdir(old_cwd)
+        return result
+    return wrapper
+
 
 class KTAnki(QtGui.QMainWindow):
 
@@ -418,6 +429,7 @@ class KTAnki(QtGui.QMainWindow):
         self.show_study_stats()
         self.show_stats()
 
+    @preserve_cwd
     def display_doc(self, html):
         doc = """
         <html>
@@ -433,6 +445,7 @@ class KTAnki(QtGui.QMainWindow):
           </body>
         </html>
         """ % html
+        os.chdir(self.deck.mediaDir())
         self.textedit.setHtml(doc)
         self.textedit.repaint()
 
