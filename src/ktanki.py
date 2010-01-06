@@ -537,10 +537,11 @@ class KTAnki(QtGui.QMainWindow):
 
     def start_refresh_timer(self):
         """Update statistic periodically."""
-        self.refresh_timer = QtCore.QTimer(self)
-        self.refresh_timer.start(REFRESH_TIME)
-        self.connect(self.refresh_timer, QtCore.SIGNAL('timeout()'),
-                     self.show_stats)
+        # self.refresh_timer = QtCore.QTimer(self)
+        # self.refresh_timer.start(REFRESH_TIME)
+        # self.connect(self.refresh_timer, QtCore.SIGNAL('timeout()'),
+        #              self.show_stats)
+        pass
 
 
 def main():
