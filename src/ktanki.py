@@ -184,6 +184,10 @@ class KTAnki(QtGui.QMainWindow):
         open_action = QtGui.QAction('Open...', self)
         self.connect(open_action, QtCore.SIGNAL('triggered()'), self.open)
 
+        refresh_action = QtGui.QAction('Refresh', self)
+        self.connect(refresh_action, QtCore.SIGNAL('triggered()'),
+                     self.show_question)
+
         save_action = QtGui.QAction('Save', self)
         self.connect(save_action, QtCore.SIGNAL('triggered()'), self.save)
 
@@ -195,6 +199,7 @@ class KTAnki(QtGui.QMainWindow):
 
         menubar = self.menuBar()
         file = menubar.addAction(open_action)
+        file = menubar.addAction(refresh_action)
         file = menubar.addAction(save_action)
         file = menubar.addAction(sync_action)
         file = menubar.addAction(exit_action)
