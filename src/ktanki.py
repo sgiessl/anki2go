@@ -64,7 +64,7 @@ class KTAnki(QtGui.QMainWindow):
         else:
             self.textedit.clear()
             self._reset_display()
-            self.show_question()
+            self.show_study_options()
             self.show_stats()
 
     def save(self):
