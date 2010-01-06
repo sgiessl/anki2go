@@ -408,12 +408,8 @@ class KTAnki(QtGui.QMainWindow):
         self.deck.resetAfterReviewEarly()
         self.deck.save()
 
-        self.options_widget.hide()
-        self.answer_widget.hide()
-        self.repeat_widget.hide()
-        self.learnmore_widget.hide()
+        self._reset_display()
         self.contreview_widget.show()
-
         self.show_study_stats()
 
     def display_doc(self, html):
