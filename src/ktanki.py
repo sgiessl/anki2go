@@ -369,12 +369,9 @@ class KTAnki(QtGui.QMainWindow):
             question_tmpl += '<center><div class="question">%s</div></center>'
             self.options_widget.show()
             self.answer_widget.show()
-            self.learnmore_widget.hide()
-            self.repeat_widget.hide()
             self.display_doc(question_tmpl % card.question)
         else:
-            self.answer_widget.hide()
-            self.repeat_widget.hide()
+            self.deck.save()
             self.learnmore_widget.show()
             self.display_doc(self.deck.deckFinishedMsg())
 
