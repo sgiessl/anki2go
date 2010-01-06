@@ -238,6 +238,16 @@ class KTAnki(QtGui.QMainWindow):
         answer_button = QtGui.QPushButton('Show Answer')
         answer_layout.addWidget(answer_button)
 
+        # continue reviewing button
+        self.contreview_widget = contreview_widget = QtGui.QWidget()
+        contreview_layout = QtGui.QHBoxLayout()
+        contreview_layout.setSpacing(0)
+        contreview_widget.setLayout(contreview_layout)
+        main_layout.addWidget(contreview_widget)
+        contreview_button = QtGui.QPushButton('Continue Reviewing')
+        contreview_layout.addWidget(contreview_button)
+        contreview_widget.hide()
+
         # learn/review buttons
         self.learnmore_widget = learnmore_widget = QtGui.QWidget()
         learnmore_layout = QtGui.QHBoxLayout()
@@ -278,6 +288,8 @@ class KTAnki(QtGui.QMainWindow):
         self.connect(undo_button, QtCore.SIGNAL('clicked()'), self.undo)
         self.connect(studyopt_button, QtCore.SIGNAL('clicked()'),
                      self.show_study_options)
+        self.connect(contreview_button, QtCore.SIGNAL('clicked()'),
+                     self.show_question)
 
         # central widget
         self.setCentralWidget(main_widget)
@@ -290,6 +302,7 @@ class KTAnki(QtGui.QMainWindow):
         self.answer_widget.hide()
         self.learnmore_widget.hide()
         self.repeat_widget.hide()
+        self.contreview_widget.hide()
 
     def button_clicked(self, cmd):
         if cmd == 'answer':
@@ -346,11 +359,13 @@ class KTAnki(QtGui.QMainWindow):
         return warning
 
     def show_question(self):
-        card = self.current_card = self.deck.getCard(orm=False)
-        question_tmpl = self.get_future_warning()
-        question_tmpl += '<center><div class="question">%s</div></center>'
-
+        self._reset_display()
+        if self.current_card is None:
+            self.current_card = self.deck.getCard(orm=False)
+        card = self.current_card
         if card is not None:
+            question_tmpl = self.get_future_warning()
+            question_tmpl += '<center><div class="question">%s</div></center>'
             self.options_widget.show()
             self.answer_widget.show()
             self.learnmore_widget.hide()
@@ -396,7 +411,8 @@ class KTAnki(QtGui.QMainWindow):
         self.options_widget.hide()
         self.answer_widget.hide()
         self.repeat_widget.hide()
-        self.learnmore_widget.show()
+        self.learnmore_widget.hide()
+        self.contreview_widget.show()
 
         self.show_study_stats()
 
