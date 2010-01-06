@@ -205,6 +205,10 @@ class KTAnki(QtGui.QMainWindow):
         sync_action = QtGui.QAction('Sync', self)
         self.connect(sync_action, QtCore.SIGNAL('triggered()'), self.sync)
 
+        study_action = QtGui.QAction('Study Options', self)
+        self.connect(study_action, QtCore.SIGNAL('triggered()'),
+                     self.show_study_options)
+
         exit_action = QtGui.QAction('Exit', self)
         self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.close)
 
@@ -213,6 +217,7 @@ class KTAnki(QtGui.QMainWindow):
         file = menubar.addAction(refresh_action)
         file = menubar.addAction(save_action)
         file = menubar.addAction(sync_action)
+        file = menubar.addAction(study_action)
         file = menubar.addAction(exit_action)
 
     def _init_central_widget(self):
