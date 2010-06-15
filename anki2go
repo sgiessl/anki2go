@@ -16,16 +16,6 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.join(modDir, ".."), "libanki"))
     sys.path.insert(0, os.path.join(modDir, "src"))
 
-    import ktanki
+    import anki2go
 
-    # try:
-    #     import ankiqt.forms
-    # except ImportError:
-    #     print
-    #     print "You need to run tools/build_ui.sh in order for anki to work."
-    #     print
-    #     raise
-
-    #import profile
-    #profile.run("ankiqt.run()", sort="cumulative")
-    ktanki.main()
+    anki2go.main()

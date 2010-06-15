@@ -1,4 +1,5 @@
 # Copyright (C) 2010  Sandro Giessl <sgiessl@gmail.com>
+# Copyright (C) 2009  Ruslan Spivak http://ruslanspivak.com
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -38,16 +39,6 @@ from anki.utils import fmtTimeSpan
 CONFIG_PATH = '~/.anki2gorc'
 # default is 60 seconds
 REFRESH_TIME = 60 * 1000
-
-# def preserve_cwd(func):
-#     @wraps(func)
-#     def wrapper(*args, **kwargs):
-#         old_cwd = os.getcwd()
-#         result = func(*args, **kwargs)
-#         os.chdir(old_cwd)
-#         return result
-#     return wrapper
-
 
 class Anki2Go(QtGui.QMainWindow):
 
@@ -134,9 +125,6 @@ class Anki2Go(QtGui.QMainWindow):
 
         self.config.set('anki2go', 'recent_deck_path', self.deck_path)
         self.write_config()
-
-
-
 
     def save(self):
         if self.deck is None:
@@ -348,8 +336,10 @@ class Anki2Go(QtGui.QMainWindow):
         self.learnmore_widget = learnmore_widget = QtGui.QWidget()
         learnmore_layout = QtGui.QHBoxLayout()
         learnmore_layout.setSpacing(0)
+        sync_button2 = QtGui.QPushButton('Sync')
         learnmore_button = QtGui.QPushButton('Learn More')
         reviewearly_button = QtGui.QPushButton('Review Early')
+        learnmore_layout.addWidget(sync_button2)
         learnmore_layout.addWidget(learnmore_button)
         learnmore_layout.addWidget(reviewearly_button)
         learnmore_widget.setLayout(learnmore_layout)
@@ -385,6 +375,7 @@ class Anki2Go(QtGui.QMainWindow):
         self.connect(contreview_button, QtCore.SIGNAL('clicked()'),
                      self.show_question)
         self.connect(sync_button, QtCore.SIGNAL('clicked()'), self.sync)
+        self.connect(sync_button2, QtCore.SIGNAL('clicked()'), self.sync)
         self.connect(self.zoomslider, QtCore.SIGNAL('valueChanged(int)'), self.setZoom)
 
         # central widget
@@ -537,7 +528,6 @@ class Anki2Go(QtGui.QMainWindow):
             print e.message
             pass
 
-#    @preserve_cwd
     def display_doc(self, html):
         doc = """
         <html>
