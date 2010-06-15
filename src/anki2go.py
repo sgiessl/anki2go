@@ -1,5 +1,4 @@
-# Copyright (C) 2009  Ruslan Spivak
-# http://ruslanspivak.com
+# Copyright (C) 2010  Sandro Giessl <sgiessl@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,37 +17,51 @@ import sys
 import time
 import datetime
 
+from qwebviewselectionsuppressor import QWebViewSelectionSuppressor
+from settingsdialog import SettingsDialog
+
 from functools import partial
 from functools import wraps
 from ConfigParser import ConfigParser
 
 from PyQt4 import QtGui
 from PyQt4 import QtCore
+from PyQt4.QtWebKit import QWebPage
+from PyQt4.QtWebKit import QWebView
+from PyQt4.QtCore import QUrl
 
 from anki import DeckStorage
 from anki.sync import SyncClient
 from anki.sync import HttpSyncServerProxy
 from anki.utils import fmtTimeSpan
 
-CONFIG_PATH = '~/.ktankirc'
+CONFIG_PATH = '~/.anki2gorc'
 # default is 60 seconds
 REFRESH_TIME = 60 * 1000
 
-def preserve_cwd(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        old_cwd = os.getcwd()
-        result = func(*args, **kwargs)
-        os.chdir(old_cwd)
-        return result
-    return wrapper
+# def preserve_cwd(func):
+#     @wraps(func)
+#     def wrapper(*args, **kwargs):
+#         old_cwd = os.getcwd()
+#         result = func(*args, **kwargs)
+#         os.chdir(old_cwd)
+#         return result
+#     return wrapper
 
 
-class KTAnki(QtGui.QMainWindow):
+class Anki2Go(QtGui.QMainWindow):
 
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
-        self.setWindowTitle('Simple Reviewer - Anki')
+
+        self.maemoPlatform = False
+        try:
+            from PyQt4.QtMaemo5 import QMaemo5ValueButton
+            self.maemoPlatform = True
+        except ImportError, e:
+            pass
+
+        self.setWindowTitle('Anki2Go')
 
         self._init_menu_bar()
 
@@ -59,26 +72,71 @@ class KTAnki(QtGui.QMainWindow):
         self.current_card = None
 
         self.config = config = ConfigParser()
-        config.read(os.path.expanduser(CONFIG_PATH))
 
-    def open(self):
-        self.deck_path = QtGui.QFileDialog.getOpenFileName(
-            self, 'Open', '.', 'Anki deck files (*.anki)')
-        # QString --> str
-        self.deck_path = str(self.deck_path)
+        config.read(os.path.expanduser(CONFIG_PATH))
+        if not self.config.has_section('anki2go'):
+            self.config.add_section('anki2go')
 
         try:
-            self.deck = DeckStorage.Deck(self.deck_path, backup=False)
+            orient = bool(self.config.get('anki2go', 'orientationPortrait'))
+            self.setPortraitOrientation(orient)
+        except Exception, e:
+            print e.message
+            self.setPortraitOrientation(False)
+            pass
+
+        try:
+            filepath = self.config.get('anki2go', 'recent_deck_path')
+            self.openPath(filepath)
+        except:
+            pass
+
+        try:
+            zoom = float(self.config.get('anki2go', 'zoom'))
+            self.setZoom(zoom)
+        except:
+            self.setZoom(100)
+            pass
+
+    def setPortraitOrientation(self, portrait):
+        self.portraitOrientation = portrait
+
+        if not self.maemoPlatform:
+            return
+
+        self.setAttribute(QtCore.Qt.WA_Maemo5LandscapeOrientation, not portrait);
+        self.setAttribute(QtCore.Qt.WA_Maemo5PortraitOrientation, portrait);
+            # self.setAttribute(QtCore.Qt.WA_Maemo5AutoOrientation, True);
+
+    def getPortraitOrientation(self):
+        return self.portraitOrientation
+
+    def open(self):
+        path = QtGui.QFileDialog.getOpenFileName(
+            self, 'Open', '.', 'Anki deck files (*.anki)')
+        # QString --> str
+        self.openPath(str(path))
+
+    def openPath(self, path):
+        try:
+            self.deck = DeckStorage.Deck(path, backup=False)
             self.deck.initUndo()
             self.deck.rebuildQueue()
         except Exception, e:
             QtGui.QMessageBox.critical(self, 'Open error', e.message)
         else:
-            self.textedit.clear()
+            self.webview.setHtml("<html><body></body></html>");
             self._reset_display()
             self.show_study_options()
             self.show_stats()
             self.start_refresh_timer()
+            self.deck_path = str(path)
+
+        self.config.set('anki2go', 'recent_deck_path', self.deck_path)
+        self.write_config()
+
+
+
 
     def save(self):
         if self.deck is None:
@@ -88,7 +146,7 @@ class KTAnki(QtGui.QMainWindow):
             return
 
         reply = QtGui.QMessageBox.question(
-            self, 'Ktanki - Unsaved changes',
+            self, 'Anki2Go - Unsaved changes',
             'Save unsaved changes?',
             QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
 
@@ -104,10 +162,9 @@ class KTAnki(QtGui.QMainWindow):
                 self.show_question()
 
     def sync(self):
-        config = self.config
         try:
-            sync_username = config.get('ktanki', 'sync_username')
-            sync_password = config.get('ktanki', 'sync_password')
+            sync_username = self.config.get('anki2go', 'sync_username')
+            sync_password = self.config.get('anki2go', 'sync_password')
         except Exception, e:
             QtGui.QMessageBox.critical(self, 'Sync error', e.message)
             return
@@ -209,16 +266,21 @@ class KTAnki(QtGui.QMainWindow):
         self.connect(study_action, QtCore.SIGNAL('triggered()'),
                      self.show_study_options)
 
+        settings_action = QtGui.QAction('Settings...', self)
+        self.connect(settings_action, QtCore.SIGNAL('triggered()'),
+                     self.show_settings)
+
         exit_action = QtGui.QAction('Exit', self)
         self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.exit_app)
 
         menubar = self.menuBar()
-        file = menubar.addAction(open_action)
-        file = menubar.addAction(refresh_action)
-        file = menubar.addAction(save_action)
-        file = menubar.addAction(sync_action)
-        file = menubar.addAction(study_action)
-        file = menubar.addAction(exit_action)
+        menubar.addAction(open_action)
+        menubar.addAction(refresh_action)
+        menubar.addAction(save_action)
+        menubar.addAction(sync_action)
+        menubar.addAction(study_action)
+        menubar.addAction(settings_action)
+        menubar.addAction(exit_action)
 
     def _init_central_widget(self):
         main_widget = QtGui.QWidget()
@@ -242,18 +304,24 @@ class KTAnki(QtGui.QMainWindow):
         self.save_button = save_button = QtGui.QPushButton('Save')
         self.save_button_style = save_button.styleSheet()
 
-        sync_button = QtGui.QPushButton('Sync')
         undo_button = QtGui.QPushButton('Undo Answer')
-        studyopt_button = QtGui.QPushButton('Study Options')
-        options_layout.addWidget(save_button)
-        options_layout.addWidget(sync_button)
+        stop_review_button = QtGui.QPushButton('Stop')
+        self.zoomslider = QtGui.QSlider(self)
+        self.zoomslider.setOrientation(QtCore.Qt.Horizontal)
+        self.zoomslider.setMinimum(25)
+        self.zoomslider.setMaximum(250)
+        # self.zoomslider.setSingleStep(25)
+        # self.zoomslider.setPageStep(25)
+        # self.zoomslider.setTickInterval(25)
+        # self.zoomslider.setTickPosition(QtGui.QSlider.TicksBelow)
         options_layout.addWidget(undo_button)
-        options_layout.addWidget(studyopt_button)
+        options_layout.addWidget(stop_review_button)
+        options_layout.addWidget(self.zoomslider)
 
-        # central read-only QTextEdit widget
-        self.textedit = QtGui.QTextEdit()
-        self.textedit.setReadOnly(True)
-        main_layout.addWidget(self.textedit)
+        # central read-only html rendering widget
+        self.webview = QWebView()
+        self.viewSelectionSuppressor = QWebViewSelectionSuppressor(self.webview)
+        main_layout.addWidget(self.webview)
 
         # answer
         self.answer_widget = answer_widget = QtGui.QWidget()
@@ -270,7 +338,9 @@ class KTAnki(QtGui.QMainWindow):
         contreview_layout.setSpacing(0)
         contreview_widget.setLayout(contreview_layout)
         main_layout.addWidget(contreview_widget)
+        sync_button = QtGui.QPushButton('Sync')
         contreview_button = QtGui.QPushButton('Continue Reviewing')
+        contreview_layout.addWidget(sync_button)
         contreview_layout.addWidget(contreview_button)
         contreview_widget.hide()
 
@@ -309,13 +379,13 @@ class KTAnki(QtGui.QMainWindow):
                      partial(self.button_clicked, 'learn_more'))
         self.connect(reviewearly_button, QtCore.SIGNAL('clicked()'),
                      partial(self.button_clicked, 'review_early'))
-        self.connect(save_button, QtCore.SIGNAL('clicked()'), self.save)
-        self.connect(sync_button, QtCore.SIGNAL('clicked()'), self.sync)
         self.connect(undo_button, QtCore.SIGNAL('clicked()'), self.undo)
-        self.connect(studyopt_button, QtCore.SIGNAL('clicked()'),
+        self.connect(stop_review_button, QtCore.SIGNAL('clicked()'),
                      self.show_study_options)
         self.connect(contreview_button, QtCore.SIGNAL('clicked()'),
                      self.show_question)
+        self.connect(sync_button, QtCore.SIGNAL('clicked()'), self.sync)
+        self.connect(self.zoomslider, QtCore.SIGNAL('valueChanged(int)'), self.setZoom)
 
         # central widget
         self.setCentralWidget(main_widget)
@@ -329,6 +399,12 @@ class KTAnki(QtGui.QMainWindow):
         self.learnmore_widget.hide()
         self.repeat_widget.hide()
         self.contreview_widget.hide()
+
+    def setZoom(self, value):
+        self.zoomslider.setValue(value)
+        self.webview.setZoomFactor(value/100.0)
+        self.config.set('anki2go', 'zoom', value)
+        self.write_config()
 
     def button_clicked(self, cmd):
         if cmd == 'answer':
@@ -434,7 +510,34 @@ class KTAnki(QtGui.QMainWindow):
         self.show_study_stats()
         self.show_stats()
 
-    @preserve_cwd
+    def show_settings(self):
+        dlg = SettingsDialog(self)
+        try:
+            sync_username = self.config.get('anki2go', 'sync_username')
+            sync_password = self.config.get('anki2go', 'sync_password')
+            dlg.user.setText(sync_username)
+            dlg.pw.setText(sync_password)
+        except:
+            pass
+
+        dlg.setPortrait( self.getPortraitOrientation() )
+        if dlg.exec_() == QtGui.QDialog.Accepted:
+            self.setPortraitOrientation(dlg.getPortrait())
+            self.config.set('anki2go', 'sync_username', dlg.user.text())
+            self.config.set('anki2go', 'sync_password', dlg.pw.text())
+            self.config.set('anki2go', 'orientationPortrait', dlg.getPortrait())
+            self.write_config()
+
+    def write_config(self):
+        try:
+            configfile = open(os.path.expanduser(CONFIG_PATH), 'wb')
+            self.config.write(configfile)
+            configfile.close()
+        except Exception, e:
+            print e.message
+            pass
+
+#    @preserve_cwd
     def display_doc(self, html):
         doc = """
         <html>
@@ -450,9 +553,12 @@ class KTAnki(QtGui.QMainWindow):
           </body>
         </html>
         """ % html
-        os.chdir(self.deck.mediaDir())
-        self.textedit.setHtml(doc)
-        self.textedit.repaint()
+
+        if self.deck.mediaDir() != None:
+            # os.chdir(self.deck.mediaDir())
+            self.webview.setHtml(doc, QUrl("file://%s/" % self.deck.mediaDir()) )
+        else:
+            self.webview.setHtml(doc);
 
     def show_stats(self):
         s = self.deck.getStats(short=True)
@@ -562,9 +668,10 @@ class KTAnki(QtGui.QMainWindow):
         pass
 
     def exit_app(self):
+        self.write_config()
         if self.deck is not None and self.deck.modifiedSinceSave():
             reply = QtGui.QMessageBox.question(
-                self, 'Ktanki - Unsaved changes',
+                self, 'Anki2Go - Unsaved changes',
                 'Save unsaved changes?',
                 QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
             if reply == QtGui.QMessageBox.Yes:
@@ -579,8 +686,8 @@ class KTAnki(QtGui.QMainWindow):
 def main():
     app = QtGui.QApplication(sys.argv)
 
-    ktanki = KTAnki()
-    ktanki.show()
+    anki2go = Anki2Go()
+    anki2go.show()
 
     sys.exit(app.exec_())
 
