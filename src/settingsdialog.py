@@ -20,6 +20,8 @@ class SettingsDialog(QtGui.QDialog):
     def __init__(self, parent):
         QtGui.QDialog.__init__(self, parent)
 
+        self.setWindowTitle("Settings")
+
         l = QtGui.QVBoxLayout()
         self.setLayout(l)
 

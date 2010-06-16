@@ -20,6 +20,7 @@ import datetime
 
 from qwebviewselectionsuppressor import QWebViewSelectionSuppressor
 from settingsdialog import SettingsDialog
+from activetags import ActiveTagsChooser
 
 from functools import partial
 from functools import wraps
@@ -254,6 +255,10 @@ class Anki2Go(QtGui.QMainWindow):
         self.connect(study_action, QtCore.SIGNAL('triggered()'),
                      self.show_study_options)
 
+        active_tags_action = QtGui.QAction('Inactive Tags...', self)
+        self.connect(active_tags_action, QtCore.SIGNAL('triggered()'),
+                     self.activeTagsDialog)
+
         settings_action = QtGui.QAction('Settings...', self)
         self.connect(settings_action, QtCore.SIGNAL('triggered()'),
                      self.show_settings)
@@ -267,6 +272,7 @@ class Anki2Go(QtGui.QMainWindow):
         menubar.addAction(save_action)
         menubar.addAction(sync_action)
         menubar.addAction(study_action)
+        menubar.addAction(active_tags_action)
         menubar.addAction(settings_action)
         menubar.addAction(exit_action)
 
@@ -518,6 +524,11 @@ class Anki2Go(QtGui.QMainWindow):
             self.config.set('anki2go', 'sync_password', dlg.pw.text())
             self.config.set('anki2go', 'orientationPortrait', dlg.getPortrait())
             self.write_config()
+
+    def activeTagsDialog(self):
+        dlg = ActiveTagsChooser(self)
+        if dlg.exec_() == QtGui.QDialog.Accepted:
+            self.show_study_options()
 
     def write_config(self):
         try:
