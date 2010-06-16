@@ -21,6 +21,7 @@ import datetime
 from qwebviewselectionsuppressor import QWebViewSelectionSuppressor
 from settingsdialog import SettingsDialog
 from activetags import ActiveTagsChooser
+from reviewwindow import ReviewWindow
 
 from functools import partial
 from functools import wraps
@@ -38,8 +39,6 @@ from anki.sync import HttpSyncServerProxy
 from anki.utils import fmtTimeSpan
 
 CONFIG_PATH = '~/.anki2gorc'
-# default is 60 seconds
-REFRESH_TIME = 60 * 1000
 
 class Anki2Go(QtGui.QMainWindow):
 
@@ -69,6 +68,10 @@ class Anki2Go(QtGui.QMainWindow):
         if not self.config.has_section('anki2go'):
             self.config.add_section('anki2go')
 
+        if self.maemoPlatform:
+            self.setAttribute(QtCore.Qt.WA_Maemo5StackedWindow);
+        self.reviewWindow = ReviewWindow(self)
+
         try:
             orient = bool(self.config.get('anki2go', 'orientationPortrait'))
             self.setPortraitOrientation(orient)
@@ -85,9 +88,9 @@ class Anki2Go(QtGui.QMainWindow):
 
         try:
             zoom = float(self.config.get('anki2go', 'zoom'))
-            self.setZoom(zoom)
+            self.reviewWindow.setZoom(zoom)
         except:
-            self.setZoom(100)
+            self.reviewWindow.setZoom(100)
             pass
 
     def setPortraitOrientation(self, portrait):
@@ -118,10 +121,7 @@ class Anki2Go(QtGui.QMainWindow):
             QtGui.QMessageBox.critical(self, 'Open error', e.message)
         else:
             self.webview.setHtml("<html><body></body></html>");
-            self._reset_display()
             self.show_study_options()
-            self.show_stats()
-            self.start_refresh_timer()
             self.deck_path = str(path)
 
         self.config.set('anki2go', 'recent_deck_path', self.deck_path)
@@ -146,9 +146,6 @@ class Anki2Go(QtGui.QMainWindow):
                 self.deck.save()
             except Exception, e:
                 QtGui.QMessageBox.critical(self, 'Save error', e.message)
-            else:
-                self.save_button.setStyleSheet(self.save_button_style)
-                self.show_question()
 
     def sync(self):
         try:
@@ -221,60 +218,34 @@ class Anki2Go(QtGui.QMainWindow):
         self.deck.s.commit()
 
         # show question
-        QtGui.QMessageBox.information(self, 'Sync', 'Sync completed.')
-        self._reset_display()
-        self.show_question()
-        self.show_stats()
+        QtGui.QMessageBox.information(self, 'Sync', 'Sync completed. %s' % pr)
 
-    def undo(self):
-        if self.deck is not None:
-            self.deck.undo()
-            self.deck.refresh()
-            self.deck.updateAllPriorities()
-            self.deck.rebuildCounts()
-            self.deck.rebuildQueue()
-            self._reset_display()
-            self.show_question()
-            self.show_stats()
+        self.show_study_options()
 
     def _init_menu_bar(self):
-        open_action = QtGui.QAction('Open...', self)
+        open_action = QtGui.QAction('&Open', self)
         self.connect(open_action, QtCore.SIGNAL('triggered()'), self.open)
 
-        refresh_action = QtGui.QAction('Refresh', self)
-        self.connect(refresh_action, QtCore.SIGNAL('triggered()'),
-                     self.show_question)
-
-        save_action = QtGui.QAction('Save', self)
+        save_action = QtGui.QAction('&Save', self)
         self.connect(save_action, QtCore.SIGNAL('triggered()'), self.save)
 
-        sync_action = QtGui.QAction('Sync', self)
+        sync_action = QtGui.QAction('S&ync', self)
         self.connect(sync_action, QtCore.SIGNAL('triggered()'), self.sync)
 
-        study_action = QtGui.QAction('Study Options', self)
-        self.connect(study_action, QtCore.SIGNAL('triggered()'),
-                     self.show_study_options)
-
-        active_tags_action = QtGui.QAction('Inactive Tags...', self)
+        active_tags_action = QtGui.QAction('Set &Inactive Tags', self)
         self.connect(active_tags_action, QtCore.SIGNAL('triggered()'),
                      self.activeTagsDialog)
 
-        settings_action = QtGui.QAction('Settings...', self)
+        settings_action = QtGui.QAction('Se&ttings', self)
         self.connect(settings_action, QtCore.SIGNAL('triggered()'),
                      self.show_settings)
 
-        exit_action = QtGui.QAction('Exit', self)
-        self.connect(exit_action, QtCore.SIGNAL('triggered()'), self.exit_app)
-
         menubar = self.menuBar()
         menubar.addAction(open_action)
-        menubar.addAction(refresh_action)
         menubar.addAction(save_action)
         menubar.addAction(sync_action)
-        menubar.addAction(study_action)
         menubar.addAction(active_tags_action)
         menubar.addAction(settings_action)
-        menubar.addAction(exit_action)
 
     def _init_central_widget(self):
         main_widget = QtGui.QWidget()
@@ -282,49 +253,10 @@ class Anki2Go(QtGui.QMainWindow):
         main_widget.setLayout(main_layout)
         main_layout.setSpacing(0)
 
-        # stats
-        stats_layout = QtGui.QHBoxLayout()
-        main_layout.addLayout(stats_layout)
-        self.stats_label = stats_label = QtGui.QLabel()
-        stats_layout.addWidget(stats_label)
-        self.stats2_label = stats2_label = QtGui.QLabel()
-        stats_layout.addWidget(stats2_label)
-
-        # top buttons
-        self.options_widget = options_widget = QtGui.QWidget()
-        options_layout = QtGui.QHBoxLayout()
-        options_widget.setLayout(options_layout)
-        main_layout.addWidget(options_widget)
-        self.save_button = save_button = QtGui.QPushButton('Save')
-        self.save_button_style = save_button.styleSheet()
-
-        undo_button = QtGui.QPushButton('Undo Answer')
-        stop_review_button = QtGui.QPushButton('Stop')
-        self.zoomslider = QtGui.QSlider(self)
-        self.zoomslider.setOrientation(QtCore.Qt.Horizontal)
-        self.zoomslider.setMinimum(25)
-        self.zoomslider.setMaximum(250)
-        # self.zoomslider.setSingleStep(25)
-        # self.zoomslider.setPageStep(25)
-        # self.zoomslider.setTickInterval(25)
-        # self.zoomslider.setTickPosition(QtGui.QSlider.TicksBelow)
-        options_layout.addWidget(undo_button)
-        options_layout.addWidget(stop_review_button)
-        options_layout.addWidget(self.zoomslider)
-
         # central read-only html rendering widget
         self.webview = QWebView()
         self.viewSelectionSuppressor = QWebViewSelectionSuppressor(self.webview)
         main_layout.addWidget(self.webview)
-
-        # answer
-        self.answer_widget = answer_widget = QtGui.QWidget()
-        answer_layout = QtGui.QHBoxLayout()
-        answer_layout.setSpacing(0)
-        answer_widget.setLayout(answer_layout)
-        main_layout.addWidget(answer_widget)
-        answer_button = QtGui.QPushButton('Show Answer')
-        answer_layout.addWidget(answer_button)
 
         # continue reviewing button
         self.contreview_widget = contreview_widget = QtGui.QWidget()
@@ -338,174 +270,25 @@ class Anki2Go(QtGui.QMainWindow):
         contreview_layout.addWidget(contreview_button)
         contreview_widget.hide()
 
-        # learn/review buttons
-        self.learnmore_widget = learnmore_widget = QtGui.QWidget()
-        learnmore_layout = QtGui.QHBoxLayout()
-        learnmore_layout.setSpacing(0)
-        sync_button2 = QtGui.QPushButton('Sync')
-        learnmore_button = QtGui.QPushButton('Learn More')
-        reviewearly_button = QtGui.QPushButton('Review Early')
-        learnmore_layout.addWidget(sync_button2)
-        learnmore_layout.addWidget(learnmore_button)
-        learnmore_layout.addWidget(reviewearly_button)
-        learnmore_widget.setLayout(learnmore_layout)
-        main_layout.addWidget(learnmore_widget)
-
-        # repeat interval buttons
-        self.repeat_widget = repeat_widget = QtGui.QWidget()
-        repeat_layout = QtGui.QHBoxLayout()
-        repeat_layout.setSpacing(0)
-        repeat_widget.setLayout(repeat_layout)
-        main_layout.addWidget(repeat_widget)
-        self.repeat_buttons = []
-        for index in range(4):
-            if index == 0:
-                button = QtGui.QPushButton('Soon')
-            else:
-                button = QtGui.QPushButton(str(index))
-            self.connect(button, QtCore.SIGNAL('clicked()'),
-                         partial(self.repeat_clicked, index+1))
-            repeat_layout.addWidget(button)
-            self.repeat_buttons.append(button)
-
         # signals/slots
-        self.connect(answer_button, QtCore.SIGNAL('clicked()'),
-                     partial(self.button_clicked, 'answer'))
-        self.connect(learnmore_button, QtCore.SIGNAL('clicked()'),
-                     partial(self.button_clicked, 'learn_more'))
-        self.connect(reviewearly_button, QtCore.SIGNAL('clicked()'),
-                     partial(self.button_clicked, 'review_early'))
-        self.connect(undo_button, QtCore.SIGNAL('clicked()'), self.undo)
-        self.connect(stop_review_button, QtCore.SIGNAL('clicked()'),
-                     self.show_study_options)
         self.connect(contreview_button, QtCore.SIGNAL('clicked()'),
-                     self.show_question)
+                     self.showReviewWindow)
+
         self.connect(sync_button, QtCore.SIGNAL('clicked()'), self.sync)
-        self.connect(sync_button2, QtCore.SIGNAL('clicked()'), self.sync)
-        self.connect(self.zoomslider, QtCore.SIGNAL('valueChanged(int)'), self.setZoom)
 
         # central widget
         self.setCentralWidget(main_widget)
 
-        self._reset_display()
-
-    def _reset_display(self):
-        # show/hide widgets for initial display
-        self.options_widget.hide()
-        self.answer_widget.hide()
-        self.learnmore_widget.hide()
-        self.repeat_widget.hide()
-        self.contreview_widget.hide()
-
-    def setZoom(self, value):
-        self.zoomslider.setValue(value)
-        self.webview.setZoomFactor(value/100.0)
-        self.config.set('anki2go', 'zoom', value)
-        self.write_config()
-
-    def button_clicked(self, cmd):
-        if cmd == 'answer':
-            self.answer_widget.hide()
-            self.learnmore_widget.hide()
-            self.repeat_widget.show()
-            self.show_answer()
-
-        elif cmd == 'learn_more':
-            self.deck.newEarly = True
-            self.deck.refresh()
-            self.deck.updateAllPriorities()
-            self.deck.rebuildCounts()
-            self.deck.rebuildQueue()
-
-            self.answer_widget.show()
-            self.learnmore_widget.hide()
-            self.repeat_widget.hide()
-            self.show_question()
-            self.show_stats()
-
-        elif cmd == 'review_early':
-            self.deck.reviewEarly = True
-            self.deck.refresh()
-            self.deck.updateAllPriorities()
-            self.deck.rebuildCounts()
-            self.deck.rebuildQueue()
-
-            self.answer_widget.show()
-            self.learnmore_widget.hide()
-            self.repeat_widget.hide()
-            self.show_question()
-            self.show_stats()
-
-    def repeat_clicked(self, ease):
-        """@ease - integer"""
-        if self.current_card is not None:
-            self.deck.answerCard(self.current_card, ease)
-        self.show_question()
-        self.show_stats()
-
-    def get_future_warning(self):
-        if (self.current_card is None
-            or self.current_card.due <= time.time()
-            or self.current_card.due - time.time() <= self.deck.delay0
-            ):
-            return ''
-        warning = (
-            '<center><span style="color: red;">' +
-            'This card was due in %s.' % fmtTimeSpan(
-                self.current_card.due - time.time(), after=False) +
-            '</span></center>'
-            )
-        return warning
-
-    def show_question(self):
-        self._reset_display()
-        card = self.current_card = self.deck.getCard(orm=False)
-        if card is not None:
-            question_tmpl = self.get_future_warning()
-            question_tmpl += '<center><div class="question">%s</div></center>'
-            self.options_widget.show()
-            self.answer_widget.show()
-            self.display_doc(question_tmpl % card.question)
-        else:
-            self.deck.save()
-            self.learnmore_widget.show()
-            self.display_doc(self.deck.deckFinishedMsg())
-
-        if self.deck.modifiedSinceSave():
-            self.save_button.setStyleSheet('background-color: red; ')
-        else:
-            self.save_button.setStyleSheet(self.save_button_style)
-
-    def show_answer(self):
-        if self.current_card is None:
-            self.current_card = self.deck.getCard(orm=False)
-        card = self.current_card
-        card_qa = """
-        <center>
-        <div class="question">%s</div>
-        <div class="answer"> %s </div>
-        </center>
-        """ % (card.question, card.answer)
-
-        self.options_widget.show()
-        self.answer_widget.hide()
-        self.learnmore_widget.hide()
-        self.repeat_widget.show()
-
-        self.display_doc(card_qa)
-
-        for index in range(2, 5):
-            self.repeat_buttons[index-1].setText(
-                self.deck.nextIntervalStr(card, index, True))
+    def showReviewWindow(self):
+        self.reviewWindow.show_question()
+        self.reviewWindow.setVisible(True)
 
     def show_study_options(self):
         self.deck.resetAfterReviewEarly()
         self.deck.save()
 
-        self._reset_display()
         self.contreview_widget.show()
         self.show_study_stats()
-        self.show_stats()
 
     def show_settings(self):
         dlg = SettingsDialog(self)
@@ -560,28 +343,6 @@ class Anki2Go(QtGui.QMainWindow):
             self.webview.setHtml(doc, QUrl("file://%s/" % self.deck.mediaDir()) )
         else:
             self.webview.setHtml(doc);
-
-    def show_stats(self):
-        s = self.deck.getStats(short=True)
-        stats = (
-            ("T: %(dYesTotal)d/%(dTotal)d "
-             "(%(dYesTotal%)3.1f%%) "
-             "A: <b>%(gMatureYes%)3.1f%%</b>. ETA: <b>%(timeLeft)s</b>") % s)
-        f = "<font color=#990000>%(failed)d</font>"
-        r = '<font color="green">%(rev)d</font>'
-        n = "<font color=#0000ff>%(new)d</font>"
-        if self.current_card is not None:
-            if self.current_card.reps:
-                if self.current_card.successive:
-                    r = "<u>" + r + "</u>"
-                else:
-                    f = "<u>" + f + "</u>"
-            else:
-                n = "<u>" + n + "</u>"
-        stats2 = ("<font size=+2>%s+%s+%s</font>" % (f, r, n)) % s
-        self.stats_label.setText(stats)
-        self.stats2_label.setText(stats2)
-
 
     def show_study_stats(self):
         """Based on method from ankiqt."""
@@ -659,14 +420,6 @@ class Anki2Go(QtGui.QMainWindow):
         <p><table><tr>
         %s
         <td>%s</td></tr></table>""" % (stats1, stats2))
-
-    def start_refresh_timer(self):
-        """Update statistic periodically."""
-        # self.refresh_timer = QtCore.QTimer(self)
-        # self.refresh_timer.start(REFRESH_TIME)
-        # self.connect(self.refresh_timer, QtCore.SIGNAL('timeout()'),
-        #              self.show_stats)
-        pass
 
     def exit_app(self):
         self.write_config()
