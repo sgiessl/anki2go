@@ -1,2 +1,6 @@
 libanki
 *.pyc
+*.pyo
+build/
+configure-stamp
+build-stamp

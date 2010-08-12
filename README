@@ -12,6 +12,18 @@ $ cd anki2go/
 $ git clone http://github.com/dae/libanki.git
 $ ./anki2go
 
+Icon License:
+Anki2Go-icon.svg is based on http://commons.wikimedia.org/wiki/File:Anki-icon.svg:
+ Description  It is a vector graphic created in Inkscape. The elements are carefully
+              aligned to pixels on a small scale so that it looks sharp at its native
+              resolution.
+ Date         5 May 2007
+ Source       From this website. http://phatcore.com/portfolio/logos.php
+ Author       Alex Fraser
+ Permissions  Creative Commons Attribution 3.0 Unported
+              see http://creativecommons.org/licenses/by/3.0/deed.en
+
+
 Links:
 http://ichi2.net/anki/
 http://github.com/rspivak/ktanki
