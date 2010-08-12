@@ -1,2 +1,7 @@
 libanki
 *.pyc
+*.pyo
+build/
+configure-stamp
+build-stamp
+debian/anki2go
